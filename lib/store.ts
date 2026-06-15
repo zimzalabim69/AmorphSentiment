@@ -31,6 +31,15 @@ interface AppState {
 
 const ANALYZE_MS = 1900;
 
+let analyzeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearAnalyzeTimer() {
+  if (analyzeTimer !== null) {
+    clearTimeout(analyzeTimer);
+    analyzeTimer = null;
+  }
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   phase: "idle",
   query: "",
@@ -55,9 +64,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!text || get().phase === "analyzing") return;
 
     if (get().soundEnabled) playWhoosh(0.7);
+    clearAnalyzeTimer();
     set({ phase: "analyzing", query: text });
 
-    window.setTimeout(() => {
+    analyzeTimer = setTimeout(() => {
+      analyzeTimer = null;
       const result = analyzeSentiment(text);
       set((s) => ({
         phase: "result",
@@ -68,8 +79,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }, ANALYZE_MS);
   },
 
-  reset: () =>
-    set({ phase: "idle", result: null, query: "", activePreset: null }),
+  reset: () => {
+    clearAnalyzeTimer();
+    set({ phase: "idle", result: null, query: "", activePreset: null });
+  },
 
   toggleClassicMode: () => set((s) => ({ classicMode: !s.classicMode })),
 
