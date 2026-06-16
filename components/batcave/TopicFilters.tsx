@@ -17,6 +17,7 @@ const filterColors: Record<TopicFilter, string> = {
 export default function TopicFilters() {
   const topicFilter = useBatcaveStore((s) => s.topicFilter);
   const setTopicFilter = useBatcaveStore((s) => s.setTopicFilter);
+  const enterHyperFocus = useBatcaveStore((s) => s.enterHyperFocus);
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -26,12 +27,14 @@ export default function TopicFilters() {
           <button
             key={f}
             onClick={() => setTopicFilter(f)}
+            onDoubleClick={() => { if (f !== "all") enterHyperFocus(f); }}
             className="px-2 py-0.5 text-[9px] font-mono uppercase rounded transition-all border"
             style={{
               borderColor: active ? filterColors[f] : "var(--color-bat-border)",
               color: active ? filterColors[f] : "var(--color-bat-dim)",
               backgroundColor: active ? `${filterColors[f]}15` : "transparent",
             }}
+            title={f !== "all" ? "Double-click to HYPERFOCUS" : undefined}
           >
             {f}
           </button>

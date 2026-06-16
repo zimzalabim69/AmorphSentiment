@@ -3,6 +3,7 @@
 import { useBatcaveStore } from "@/lib/batcave-store";
 import { useAppStore } from "@/lib/store";
 import TopicFilters from "./TopicFilters";
+import FocusInput from "./FocusInput";
 
 export default function BatcaveTopBar() {
   const soundEnabled = useAppStore((s) => s.soundEnabled);
@@ -22,8 +23,10 @@ export default function BatcaveTopBar() {
       </div>
 
       {/* Filters (center) */}
-      <div className="hidden md:block">
+      <div className="hidden md:flex items-center gap-3">
         <TopicFilters />
+        <div className="w-px h-5 bg-[var(--color-bat-border)]" />
+        <FocusInput />
       </div>
 
       {/* Controls */}

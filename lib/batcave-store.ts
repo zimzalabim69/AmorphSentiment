@@ -3,6 +3,19 @@
 import { create } from "zustand";
 import type { LiveSignal, LiveAggregate, TopicFilter } from "./live-types";
 
+interface HyperFocusState {
+  /** Whether hyper-focus is active */
+  active: boolean;
+  /** The keyword/topic being focused on (custom or preset) */
+  keyword: string;
+  /** Signals matching the focused keyword */
+  focusedSignals: LiveSignal[];
+  /** Sentiment history for sparkline (last 50 intensity readings) */
+  sentimentHistory: number[];
+  /** Timestamp when focus started */
+  startedAt: number;
+}
+
 interface BatcaveState {
   /** Whether the live stream is connected */
   connected: boolean;
@@ -20,6 +33,8 @@ interface BatcaveState {
   globalIntensity: number;
   /** Whether batcave (live) mode is active */
   batcaveMode: boolean;
+  /** HyperFocus state */
+  hyperFocus: HyperFocusState;
 
   // Actions
   setConnected: (v: boolean) => void;
@@ -30,7 +45,19 @@ interface BatcaveState {
   setActiveWindow: (w: "30s" | "2min" | "10min") => void;
   toggleBatcaveMode: () => void;
   initFromServer: (signals: LiveSignal[], aggregates: LiveAggregate[], total: number) => void;
+  /** Enter hyper-focus on a keyword */
+  enterHyperFocus: (keyword: string) => void;
+  /** Exit hyper-focus */
+  exitHyperFocus: () => void;
 }
+
+const DEFAULT_HYPERFOCUS: HyperFocusState = {
+  active: false,
+  keyword: "",
+  focusedSignals: [],
+  sentimentHistory: [],
+  startedAt: 0,
+};
 
 export const useBatcaveStore = create<BatcaveState>((set, get) => ({
   connected: false,
@@ -41,6 +68,7 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
   activeWindow: "2min",
   globalIntensity: 0,
   batcaveMode: false,
+  hyperFocus: DEFAULT_HYPERFOCUS,
 
   setConnected: (v) => set({ connected: v }),
 
@@ -53,6 +81,21 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
     const recent = get().signals.slice(-20);
     const avgIntensity = recent.reduce((sum, sig) => sum + sig.intensity, 0) / Math.max(recent.length, 1);
     set({ globalIntensity: avgIntensity });
+
+    // If hyper-focus is active, check if signal matches the keyword
+    const { hyperFocus } = get();
+    if (hyperFocus.active && hyperFocus.keyword) {
+      const kw = hyperFocus.keyword.toLowerCase();
+      if (s.text.toLowerCase().includes(kw) || s.topic === kw) {
+        set((state) => ({
+          hyperFocus: {
+            ...state.hyperFocus,
+            focusedSignals: [...state.hyperFocus.focusedSignals, s].slice(-100),
+            sentimentHistory: [...state.hyperFocus.sentimentHistory, s.intensity].slice(-50),
+          },
+        }));
+      }
+    }
   },
 
   setAggregates: (agg) => {
@@ -69,8 +112,27 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
 
   setActiveWindow: (w) => set({ activeWindow: w }),
 
-  toggleBatcaveMode: () => set((s) => ({ batcaveMode: !s.batcaveMode })),
+  toggleBatcaveMode: () => set((s) => ({ batcaveMode: !s.batcaveMode, hyperFocus: DEFAULT_HYPERFOCUS })),
 
   initFromServer: (signals, aggregates, total) =>
     set({ signals: signals.slice(-200), aggregates, totalSignals: total, connected: true }),
+
+  enterHyperFocus: (keyword) => {
+    const { signals } = get();
+    const kw = keyword.toLowerCase();
+    const matching = signals.filter(
+      (s) => s.text.toLowerCase().includes(kw) || s.topic === kw,
+    );
+    set({
+      hyperFocus: {
+        active: true,
+        keyword,
+        focusedSignals: matching.slice(-100),
+        sentimentHistory: matching.slice(-50).map((s) => s.intensity),
+        startedAt: Date.now(),
+      },
+    });
+  },
+
+  exitHyperFocus: () => set({ hyperFocus: DEFAULT_HYPERFOCUS }),
 }));

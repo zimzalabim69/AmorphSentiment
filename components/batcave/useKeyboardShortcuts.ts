@@ -12,7 +12,8 @@ import { playWhoosh } from "@/lib/sound";
  * - Left/Right arrows: cycle topic filters
  * - 1-3: switch time windows
  * - M: toggle sound
- * - Escape: exit batcave
+ * - F: enter HyperFocus on current filter
+ * - Escape: exit HyperFocus (if active), otherwise exit batcave
  */
 export function useKeyboardShortcuts() {
   const batcaveMode = useBatcaveStore((s) => s.batcaveMode);
@@ -24,13 +25,12 @@ export function useKeyboardShortcuts() {
       // Don't intercept when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
+      const state = useBatcaveStore.getState();
+
       switch (e.code) {
         case "Space": {
           e.preventDefault();
-          // Force pulse — temporarily spike global intensity
-          const store = useBatcaveStore.getState();
-          const current = store.globalIntensity;
-          // Spike to 1.0, then decay naturally
+          const current = state.globalIntensity;
           useBatcaveStore.setState({ globalIntensity: Math.min(current + 0.4, 1.0) });
           if (useAppStore.getState().soundEnabled) playWhoosh(0.8);
           break;
@@ -38,27 +38,40 @@ export function useKeyboardShortcuts() {
         case "ArrowLeft":
         case "ArrowRight": {
           e.preventDefault();
-          const store = useBatcaveStore.getState();
-          const idx = TOPIC_FILTERS.indexOf(store.topicFilter);
+          // If in HyperFocus, arrows do nothing (or could cycle focus targets)
+          if (state.hyperFocus.active) break;
+          const idx = TOPIC_FILTERS.indexOf(state.topicFilter);
           const dir = e.code === "ArrowRight" ? 1 : -1;
           const next = (idx + dir + TOPIC_FILTERS.length) % TOPIC_FILTERS.length;
-          useBatcaveStore.getState().setTopicFilter(TOPIC_FILTERS[next]);
+          state.setTopicFilter(TOPIC_FILTERS[next]);
           break;
         }
         case "Digit1":
-          useBatcaveStore.getState().setActiveWindow("30s");
+          state.setActiveWindow("30s");
           break;
         case "Digit2":
-          useBatcaveStore.getState().setActiveWindow("2min");
+          state.setActiveWindow("2min");
           break;
         case "Digit3":
-          useBatcaveStore.getState().setActiveWindow("10min");
+          state.setActiveWindow("10min");
           break;
         case "KeyM":
           useAppStore.getState().toggleSound();
           break;
+        case "KeyF": {
+          // Enter HyperFocus on current topic filter
+          if (!state.hyperFocus.active && state.topicFilter !== "all") {
+            state.enterHyperFocus(state.topicFilter);
+          }
+          break;
+        }
         case "Escape":
-          useBatcaveStore.getState().toggleBatcaveMode();
+          // If in HyperFocus, exit focus first; otherwise exit Batcave
+          if (state.hyperFocus.active) {
+            state.exitHyperFocus();
+          } else {
+            state.toggleBatcaveMode();
+          }
           break;
       }
     }

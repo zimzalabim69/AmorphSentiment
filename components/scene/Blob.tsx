@@ -47,8 +47,10 @@ export default function Blob() {
     u.uTime.value = state.clock.elapsedTime;
 
     // Read live batcave intensity (non-reactive read per frame)
-    const globalIntensity = useBatcaveStore.getState().globalIntensity;
-    const batcaveMode = useBatcaveStore.getState().batcaveMode;
+    const batState = useBatcaveStore.getState();
+    const globalIntensity = batState.globalIntensity;
+    const batcaveMode = batState.batcaveMode;
+    const hyperFocusActive = batState.hyperFocus.active;
 
     // Detect sudden intensity spike → trigger shockwave
     if (globalIntensity - prevIntensity.current > 0.2) {
@@ -86,7 +88,9 @@ export default function Blob() {
     u.uIntensity.value = lerp(u.uIntensity.value, intensity, k);
 
     // Breathing pulse — faster + stronger while analyzing or high global intensity.
-    const pulseSpeed = analyzing ? 6.0 : 1.4 + globalIntensity * 2.0;
+    // HyperFocus amplifies everything
+    const focusBoost = hyperFocusActive ? 1.5 : 1.0;
+    const pulseSpeed = analyzing ? 6.0 : (1.4 + globalIntensity * 2.0) * focusBoost;
     u.uPulse.value = Math.sin(state.clock.elapsedTime * pulseSpeed) * 0.5 + 0.5;
 
     u.uHover.value = lerp(u.uHover.value, hoverTarget.current, Math.min(1, delta * 6));
@@ -101,10 +105,13 @@ export default function Blob() {
     u.uColorAccent.value.lerp(targetAccent, k);
 
     if (meshRef.current) {
-      const rotSpeed = analyzing ? 0.5 : 0.12 + globalIntensity * 0.3;
+      const rotSpeed = (analyzing ? 0.5 : 0.12 + globalIntensity * 0.3) * focusBoost;
       meshRef.current.rotation.y += delta * rotSpeed;
       meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.15;
-      const breathe = 1 + Math.sin(state.clock.elapsedTime * (analyzing ? 4 : 1.1 + globalIntensity * 1.5)) * 0.02;
+      // HyperFocus: slightly larger organism + deeper breathing
+      const baseScale = hyperFocusActive ? 1.05 : 1;
+      const breatheAmp = hyperFocusActive ? 0.04 : 0.02;
+      const breathe = baseScale + Math.sin(state.clock.elapsedTime * (analyzing ? 4 : 1.1 + globalIntensity * 1.5)) * breatheAmp;
       meshRef.current.scale.setScalar(breathe);
     }
   });

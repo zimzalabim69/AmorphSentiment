@@ -11,11 +11,12 @@ import { useBatcaveStore } from "@/lib/batcave-store";
 
 export default function OrganismCanvas() {
   const batcaveMode = useBatcaveStore((s) => s.batcaveMode);
+  const hyperFocusActive = useBatcaveStore((s) => s.hyperFocus.active);
 
-  // Deeper bloom + heavier vignette in batcave mode
-  const bloomIntensity = batcaveMode ? 1.8 : 1.15;
-  const bloomThreshold = batcaveMode ? 0.1 : 0.15;
-  const vignetteStrength = batcaveMode ? 1.1 : 0.85;
+  // Deeper bloom + heavier vignette in batcave mode; even more in HyperFocus
+  const bloomIntensity = hyperFocusActive ? 2.4 : batcaveMode ? 1.8 : 1.15;
+  const bloomThreshold = hyperFocusActive ? 0.05 : batcaveMode ? 0.1 : 0.15;
+  const vignetteStrength = hyperFocusActive ? 1.4 : batcaveMode ? 1.1 : 0.85;
 
   return (
     <Canvas

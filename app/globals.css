@@ -12,6 +12,8 @@
   --color-bat-amber: #ffab1a;
   --color-bat-cyan: #00e5ff;
   --color-bat-dim: #4a5068;
+  --color-bat-text: #c8ccd0;
+  --color-bat-green: #39ffb0;
   --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }

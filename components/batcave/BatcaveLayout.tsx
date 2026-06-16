@@ -10,6 +10,7 @@ import KeyPhrases from "./KeyPhrases";
 import IntensityMeter from "./IntensityMeter";
 import BottomHUD from "./BottomHUD";
 import TopicFilters from "./TopicFilters";
+import HyperFocusView from "./HyperFocusView";
 
 const OrganismCanvas = dynamic(() => import("@/components/scene/OrganismCanvas"), {
   ssr: false,
@@ -54,6 +55,9 @@ export default function BatcaveLayout() {
 
       {/* Bottom HUD */}
       <BottomHUD />
+
+      {/* HyperFocus overlay (renders on top when active) */}
+      <HyperFocusView />
     </div>
   );
 }
