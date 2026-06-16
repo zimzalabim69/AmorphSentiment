@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { SENTIMENT_COLORS } from "@/lib/sentiment";
 import { useAppStore } from "@/lib/store";
+import { useBatcaveStore } from "@/lib/batcave-store";
 
 const COUNT = 900;
 
@@ -31,20 +32,33 @@ export default function Particles() {
 
   useFrame((state, delta) => {
     if (!pointsRef.current) return;
+
+    // Live intensity drives particle speed + opacity
+    const globalIntensity = useBatcaveStore.getState().globalIntensity;
+    const speedMult = 1.0 + globalIntensity * 2.5;
+
     const geo = pointsRef.current.geometry;
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
     for (let i = 0; i < COUNT; i++) {
       const idx = i * 3;
-      arr[idx + 1] += speeds[i] * delta * 0.6;
+      arr[idx + 1] += speeds[i] * delta * 0.6 * speedMult;
       if (arr[idx + 1] > 7) arr[idx + 1] = -7;
     }
     pos.needsUpdate = true;
-    pointsRef.current.rotation.y += delta * 0.02;
+    pointsRef.current.rotation.y += delta * (0.02 + globalIntensity * 0.08);
 
     if (matRef.current) {
-      targetColor.set(SENTIMENT_COLORS[result?.dominant ?? "neutral"].glow);
+      // In batcave mode, use aggregate dominant color
+      const batcave = useBatcaveStore.getState();
+      let dominant = result?.dominant ?? "neutral";
+      if (batcave.batcaveMode && batcave.aggregates.length > 0) {
+        const active = batcave.aggregates.find((a) => a.window === batcave.activeWindow);
+        if (active && active.volume > 0) dominant = active.dominant;
+      }
+      targetColor.set(SENTIMENT_COLORS[dominant].glow);
       matRef.current.color.lerp(targetColor, Math.min(1, delta * 1.5));
+      matRef.current.opacity = 0.7 + globalIntensity * 0.3;
     }
   });
 

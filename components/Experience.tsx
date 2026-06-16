@@ -9,6 +9,7 @@ import PresetTopics from "./ui/PresetTopics";
 import ResultsPanel from "./ui/ResultsPanel";
 import ClassicMode from "./ui/ClassicMode";
 import { useAppStore } from "@/lib/store";
+import { useBatcaveStore } from "@/lib/batcave-store";
 
 const OrganismCanvas = dynamic(() => import("./scene/OrganismCanvas"), {
   ssr: false,
@@ -19,8 +20,18 @@ const OrganismCanvas = dynamic(() => import("./scene/OrganismCanvas"), {
   ),
 });
 
+const BatcaveLayout = dynamic(() => import("./batcave/BatcaveLayout"), {
+  ssr: false,
+});
+
 export default function Experience() {
   const classicMode = useAppStore((s) => s.classicMode);
+  const batcaveMode = useBatcaveStore((s) => s.batcaveMode);
+
+  // Full batcave immersive mode takes over the entire screen
+  if (batcaveMode) {
+    return <BatcaveLayout />;
+  }
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden text-white">
