@@ -86,7 +86,12 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
     const { hyperFocus } = get();
     if (hyperFocus.active && hyperFocus.keyword) {
       const kw = hyperFocus.keyword.toLowerCase();
-      if (s.text.toLowerCase().includes(kw) || s.topic === kw) {
+      const matchesText = s.text.toLowerCase().includes(kw);
+      const matchesTopic = s.topic?.toLowerCase() === kw;
+      const matchesTopics = s.topics.some((t) => t.toLowerCase() === kw);
+      const matchesEntities = s.entities.some((e) => e.name.toLowerCase() === kw || e.type.toLowerCase() === kw);
+      const matchesPhrases = s.keyPhrases.some((p) => p.toLowerCase().includes(kw));
+      if (matchesText || matchesTopic || matchesTopics || matchesEntities || matchesPhrases) {
         set((state) => ({
           hyperFocus: {
             ...state.hyperFocus,
@@ -120,9 +125,14 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
   enterHyperFocus: (keyword) => {
     const { signals } = get();
     const kw = keyword.toLowerCase();
-    const matching = signals.filter(
-      (s) => s.text.toLowerCase().includes(kw) || s.topic === kw,
-    );
+    const matching = signals.filter((s) => {
+      const matchesText = s.text.toLowerCase().includes(kw);
+      const matchesTopic = s.topic?.toLowerCase() === kw;
+      const matchesTopics = s.topics.some((t) => t.toLowerCase() === kw);
+      const matchesEntities = s.entities.some((e) => e.name.toLowerCase() === kw || e.type.toLowerCase() === kw);
+      const matchesPhrases = s.keyPhrases.some((p) => p.toLowerCase().includes(kw));
+      return matchesText || matchesTopic || matchesTopics || matchesEntities || matchesPhrases;
+    });
     set({
       hyperFocus: {
         active: true,

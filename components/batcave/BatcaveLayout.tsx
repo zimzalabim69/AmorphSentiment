@@ -8,6 +8,7 @@ import LiveFeed from "./LiveFeed";
 import EmotionRadar from "./EmotionRadar";
 import KeyPhrases from "./KeyPhrases";
 import IntensityMeter from "./IntensityMeter";
+import EntityTracker from "./EntityTracker";
 import BottomHUD from "./BottomHUD";
 import TopicFilters from "./TopicFilters";
 import HyperFocusView from "./HyperFocusView";
@@ -45,11 +46,12 @@ export default function BatcaveLayout() {
           </div>
         </main>
 
-        {/* Right panel — Emotion Radar + Phrases + Intensity */}
+        {/* Right panel — Intensity + Emotion Radar + Phrases + Entity Tracker */}
         <aside className="hidden lg:flex flex-col w-64 xl:w-72 p-2 gap-2 overflow-y-auto">
           <IntensityMeter />
           <EmotionRadar />
           <KeyPhrases />
+          <EntityTracker />
         </aside>
       </div>
 

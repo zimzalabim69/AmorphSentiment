@@ -1,5 +1,11 @@
 import type { Sentiment, SentimentScores, Emotion } from "./types";
 
+/** Entity extracted from text */
+export interface Entity {
+  name: string;
+  type: "PERSON" | "ORG" | "GPE" | "PRODUCT" | "TICKER" | "EVENT" | "TECH" | string;
+}
+
 /** A single analyzed signal from Bluesky or RSS */
 export interface LiveSignal {
   id: string;
@@ -10,6 +16,14 @@ export interface LiveSignal {
   intensity: number;
   timestamp: number;
   topic: string | null;
+  /** Dynamic topics extracted by the LLM */
+  topics: string[];
+  /** Named entities (people, orgs, tickers, etc.) */
+  entities: Entity[];
+  /** Emotion breakdown */
+  emotions: Emotion[];
+  /** Key phrases extracted from the text */
+  keyPhrases: string[];
 }
 
 /** Aggregate stats over a rolling window */
@@ -21,6 +35,10 @@ export interface LiveAggregate {
   volume: number;
   emotions: Emotion[];
   topPhrases: string[];
+  /** Most mentioned entities in this window */
+  topEntities: { name: string; type: string; mentions: number }[];
+  /** Most active dynamic topics */
+  activeTopics: { topic: string; volume: number; avgIntensity: number }[];
 }
 
 /** SSE event payload */

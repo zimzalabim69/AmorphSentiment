@@ -4,6 +4,16 @@ import { useBatcaveStore } from "@/lib/batcave-store";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
+const ENTITY_COLORS: Record<string, string> = {
+  PERSON: "#a78bfa",
+  ORG: "#22c55e",
+  GPE: "#06b6d4",
+  PRODUCT: "#f59e0b",
+  TICKER: "#39ffb0",
+  EVENT: "#ff4d6d",
+  TECH: "#ec4899",
+};
+
 export default function FocusPanels() {
   const hyperFocus = useBatcaveStore((s) => s.hyperFocus);
   const totalSignals = useBatcaveStore((s) => s.totalSignals);
@@ -23,21 +33,34 @@ export default function FocusPanels() {
   const stats = useMemo(() => {
     const signals = hyperFocus.focusedSignals;
     if (signals.length === 0) {
-      return { positive: 0, negative: 0, neutral: 0, avgIntensity: 0, topPhrases: [] as string[], matchCount: 0 };
+      return { positive: 0, negative: 0, neutral: 0, avgIntensity: 0, topPhrases: [] as string[], topEntities: [] as { name: string; type: string; mentions: number }[], matchCount: 0 };
     }
     let pos = 0, neg = 0, neu = 0;
     const phraseMap = new Map<string, number>();
+    const entityMap = new Map<string, { name: string; type: string; mentions: number }>();
+
     for (const s of signals) {
       if (s.dominant === "positive") pos++;
       else if (s.dominant === "negative") neg++;
       else neu++;
-      // Extract words for phrases
+
       const words = s.text.split(/\s+/).filter((w) => w.length > 4);
       for (const w of words.slice(0, 5)) {
         const lower = w.toLowerCase().replace(/[^a-z]/g, "");
         if (lower.length > 4) phraseMap.set(lower, (phraseMap.get(lower) || 0) + 1);
       }
+
+      for (const e of s.entities) {
+        const key = `${e.name}|${e.type}`;
+        const existing = entityMap.get(key);
+        if (existing) {
+          existing.mentions += 1;
+        } else {
+          entityMap.set(key, { name: e.name, type: e.type, mentions: 1 });
+        }
+      }
     }
+
     const total = signals.length;
     const avgIntensity = signals.reduce((sum, s) => sum + s.intensity, 0) / total;
     const topPhrases = [...phraseMap.entries()]
@@ -45,12 +68,17 @@ export default function FocusPanels() {
       .slice(0, 6)
       .map(([word]) => word);
 
+    const topEntities = [...entityMap.values()]
+      .sort((a, b) => b.mentions - a.mentions)
+      .slice(0, 8);
+
     return {
       positive: Math.round((pos / total) * 100),
       negative: Math.round((neg / total) * 100),
       neutral: Math.round((neu / total) * 100),
       avgIntensity: Math.round(avgIntensity * 100),
       topPhrases,
+      topEntities,
       matchCount: total,
     };
   }, [hyperFocus.focusedSignals]);
@@ -110,7 +138,7 @@ export default function FocusPanels() {
         </div>
       </motion.div>
 
-      {/* Right panel — live matching posts */}
+      {/* Right panel — live matching posts + entities */}
       <motion.div
         className="absolute top-16 right-0 bottom-20 w-72 z-20 overflow-hidden"
         initial={{ x: 80, opacity: 0 }}
@@ -140,10 +168,49 @@ export default function FocusPanels() {
                   <span className="text-[var(--color-bat-text)]">
                     {s.text.length > 120 ? s.text.slice(0, 120) + "…" : s.text}
                   </span>
+                  {s.entities.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-0.5 ml-3">
+                      {s.entities.slice(0, 3).map((e) => (
+                        <span
+                          key={e.name}
+                          className="text-[8px] px-1 rounded border"
+                          style={{
+                            color: ENTITY_COLORS[e.type] || "var(--color-bat-dim)",
+                            borderColor: `${ENTITY_COLORS[e.type] || "var(--color-bat-dim)"}40`,
+                            backgroundColor: `${ENTITY_COLORS[e.type] || "var(--color-bat-dim)"}10`,
+                          }}
+                        >
+                          {e.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
+
+          {/* Top entities */}
+          {stats.topEntities.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-[var(--color-bat-border)]">
+              <span className="text-[9px] font-mono text-[var(--color-bat-dim)] uppercase">Entities</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {stats.topEntities.map((e) => (
+                  <span
+                    key={`${e.name}-${e.type}`}
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded border"
+                    style={{
+                      color: ENTITY_COLORS[e.type] || "var(--color-bat-dim)",
+                      borderColor: `${ENTITY_COLORS[e.type] || "var(--color-bat-dim)"}40`,
+                      backgroundColor: `${ENTITY_COLORS[e.type] || "var(--color-bat-dim)"}10`,
+                    }}
+                  >
+                    {e.name} ({e.mentions})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Top phrases */}
           {stats.topPhrases.length > 0 && (
@@ -209,7 +276,6 @@ function Sparkline({ data }: { data: number[] }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Glow trail */}
       <polyline
         points={points}
         fill="none"
