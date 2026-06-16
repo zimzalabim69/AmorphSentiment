@@ -2,11 +2,23 @@
 
 import { useBatcaveStore } from "@/lib/batcave-store";
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function FocusPanels() {
   const hyperFocus = useBatcaveStore((s) => s.hyperFocus);
   const totalSignals = useBatcaveStore((s) => s.totalSignals);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!hyperFocus.active || !hyperFocus.startedAt) {
+      setElapsed(0);
+      return;
+    }
+    const tick = () => setElapsed(Math.round((Date.now() - hyperFocus.startedAt) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [hyperFocus.active, hyperFocus.startedAt]);
 
   const stats = useMemo(() => {
     const signals = hyperFocus.focusedSignals;
@@ -42,8 +54,6 @@ export default function FocusPanels() {
       matchCount: total,
     };
   }, [hyperFocus.focusedSignals]);
-
-  const elapsed = hyperFocus.startedAt ? Math.round((Date.now() - hyperFocus.startedAt) / 1000) : 0;
 
   return (
     <>
@@ -184,7 +194,8 @@ function Sparkline({ data }: { data: number[] }) {
   const height = 24;
   const points = data.map((v, i) => {
     const x = (i / (data.length - 1)) * width;
-    const y = height - v * height;
+    const clamped = Math.max(0, Math.min(1, v));
+    const y = height - clamped * height;
     return `${x},${y}`;
   }).join(" ");
 
