@@ -1,9 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #03040a;
-  --color-foreground: #ededed;
+  --color-background: #010104;
+  --color-foreground: #c8ccd0;
+  --color-bat-black: #010104;
+  --color-bat-dark: #0a0c12;
+  --color-bat-panel: #0d0f16;
+  --color-bat-border: #1a1d28;
+  --color-bat-red: #ff3d3d;
+  --color-bat-orange: #ff6b2c;
+  --color-bat-amber: #ffab1a;
+  --color-bat-cyan: #00e5ff;
+  --color-bat-dim: #4a5068;
+  --color-bat-text: #c8ccd0;
+  --color-bat-green: #39ffb0;
   --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 html,
@@ -12,23 +24,76 @@ body {
 }
 
 body {
-  background: #03040a;
+  background: var(--color-bat-black);
   color: var(--color-foreground);
   overscroll-behavior: none;
 }
 
-/* Slim, glowing scrollbars to match the bioluminescent theme. */
+/* CRT scanline overlay — applied to batcave mode */
+.batcave-scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* HUD glow for text */
+.hud-glow {
+  text-shadow: 0 0 6px rgba(255, 107, 44, 0.4), 0 0 20px rgba(255, 61, 61, 0.15);
+}
+
+/* Panel styling */
+.bat-panel {
+  background: rgba(13, 15, 22, 0.85);
+  border: 1px solid rgba(26, 29, 40, 0.8);
+  backdrop-filter: blur(12px);
+  border-radius: 4px;
+}
+
+/* Intensity bar glow */
+.intensity-bar {
+  box-shadow: 0 0 8px var(--color-bat-orange), 0 0 20px rgba(255, 107, 44, 0.3);
+}
+
+/* Slim scrollbars — Batcave red/orange */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(122, 245, 255, 0.3) transparent;
+  scrollbar-color: rgba(255, 107, 44, 0.3) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(122, 245, 255, 0.25);
+  background: rgba(255, 107, 44, 0.25);
   border-radius: 999px;
+}
+
+/* Keyframe for subtle pulse */
+@keyframes hud-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.hud-pulse {
+  animation: hud-pulse 2s ease-in-out infinite;
+}
+
+/* Keyframe for signal flash */
+@keyframes signal-flash {
+  0% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0.7; transform: scale(1); }
+}
+.signal-flash {
+  animation: signal-flash 0.3s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -58,6 +58,8 @@ uniform float uNeutral;
 uniform float uIntensity;
 uniform float uHover;
 uniform float uPulse;
+uniform float uShockwave;
+uniform float uGlobalIntensity;
 
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -70,6 +72,10 @@ ${SIMPLEX}
 float displace(vec3 p) {
   float t = uTime * 0.35;
 
+  // Effective intensity: combines sentiment intensity with global live intensity
+  float liveBoost = uGlobalIntensity * 0.6;
+  float totalIntensity = min(uIntensity + liveBoost, 1.0);
+
   // Big soft bloom — dominant for positive sentiment.
   float bloom = snoise(p * 1.1 + vec3(0.0, 0.0, t));
 
@@ -81,14 +87,23 @@ float displace(vec3 p) {
   float spikes = abs(snoise(p * 3.6 + vec3(t * 1.8)));
   spikes = pow(spikes, 1.5) * 1.3;
 
-  float energy = 0.25 + uIntensity * 0.85;
+  // Shockwave turbulence — triggered by sudden spikes in live data
+  float shock = 0.0;
+  if (uShockwave > 0.01) {
+    float wave = sin(length(p) * 12.0 - uTime * 8.0) * 0.5 + 0.5;
+    float highFreq = snoise(p * 8.0 + vec3(uTime * 3.0)) * 0.8;
+    shock = (wave * 0.6 + highFreq * 0.4) * uShockwave;
+  }
+
+  float energy = 0.25 + totalIntensity * 1.1;
   float d =
       bloom  * (0.45 + uPositive * 0.9) * energy
     + waves  * (0.30 + uNeutral  * 0.8) * energy
-    + spikes * (uNegative * 1.4) * energy;
+    + spikes * (uNegative * 1.6) * energy
+    + shock  * energy;
 
-  // Global breathing pulse.
-  d += uPulse * (0.12 + uIntensity * 0.18);
+  // Global breathing pulse — deeper at higher global intensity.
+  d += uPulse * (0.12 + totalIntensity * 0.25);
   return d;
 }
 
@@ -130,6 +145,8 @@ uniform vec3 uColorGlow;
 uniform vec3 uColorAccent;
 uniform float uIntensity;
 uniform float uHover;
+uniform float uShockwave;
+uniform float uGlobalIntensity;
 
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -140,23 +157,32 @@ void main() {
   vec3 normal = normalize(vNormal);
   vec3 viewDir = normalize(vViewPosition);
 
-  float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 2.4);
+  float totalIntensity = min(uIntensity + uGlobalIntensity * 0.6, 1.0);
 
-  // Internal iridescent bands that ripple over time.
-  float bands = 0.5 + 0.5 * sin(vDisplacement * 8.0 - uTime * 1.2 + vWorldPos.y * 2.0);
+  float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 2.8);
+
+  // Internal iridescent bands that ripple over time — more chaotic at high intensity.
+  float bandSpeed = 1.2 + totalIntensity * 2.0;
+  float bands = 0.5 + 0.5 * sin(vDisplacement * 10.0 - uTime * bandSpeed + vWorldPos.y * 2.5);
 
   vec3 base = mix(uColorCore, uColorAccent, bands * 0.7);
   vec3 color = mix(base, uColorGlow, fresnel);
 
-  // Brighten the bloomed/raised areas to read as bioluminescent.
+  // Brighten the bloomed/raised areas — stronger bioluminescence.
   float lume = smoothstep(-0.3, 0.8, vDisplacement);
-  color += uColorGlow * lume * (0.35 + uIntensity * 0.5);
+  color += uColorGlow * lume * (0.4 + totalIntensity * 0.7);
 
-  // Rim glow + hover boost.
-  color += uColorGlow * fresnel * (0.6 + uHover * 0.8);
+  // Rim glow + hover boost — deeper at high intensity.
+  color += uColorGlow * fresnel * (0.7 + uHover * 1.0 + totalIntensity * 0.3);
 
-  // Subtle core darkening to give depth.
-  color *= 0.75 + 0.45 * fresnel + 0.2 * bands;
+  // Shockwave: brief hot-white flash on the surface.
+  if (uShockwave > 0.01) {
+    float shockGlow = uShockwave * smoothstep(0.3, 0.9, vDisplacement) * 1.5;
+    color += vec3(1.0, 0.85, 0.6) * shockGlow;
+  }
+
+  // Subtle core darkening for depth.
+  color *= 0.7 + 0.5 * fresnel + 0.2 * bands;
 
   gl_FragColor = vec4(color, 1.0);
 }
