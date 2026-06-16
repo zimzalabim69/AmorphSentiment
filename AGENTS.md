@@ -9,6 +9,10 @@ This project uses standard Next.js 15 App Router conventions:
 - Anything that touches the DOM/window, three.js, or uses hooks/state must be a Client Component (`"use client"`).
 - The R3F `<Canvas>` is loaded with `next/dynamic` (`ssr: false`) to avoid SSR issues with WebGL.
 - Shared state between the DOM tree and the R3F canvas tree goes through the zustand store in `lib/store.ts` (React context does not cross the R3F renderer boundary reliably).
-- All data is fake/simulated — see `lib/sentiment.ts` and `lib/presets.ts`. There is no backend.
+- Original demo mode uses fake/simulated data — see `lib/sentiment.ts` and `lib/presets.ts`.
+- **Batcave mode** connects to real-time data: Bluesky Jetstream WebSocket + RSS feeds. The sentiment engine runs on live posts. All free, no API keys.
+- The live data singleton lives in `lib/jetstream.ts`, exposed via SSE at `/api/stream`.
+- Batcave frontend state is managed in `lib/batcave-store.ts` (separate from `lib/store.ts`).
+- Batcave UI components live in `components/batcave/`.
 
 Run `npm run lint` and `npm run build` before committing.

@@ -2,12 +2,14 @@
 
 import { motion } from "framer-motion";
 import { useAppStore } from "@/lib/store";
+import { useBatcaveStore } from "@/lib/batcave-store";
 
 export default function TopBar() {
   const classicMode = useAppStore((s) => s.classicMode);
   const toggleClassicMode = useAppStore((s) => s.toggleClassicMode);
   const soundEnabled = useAppStore((s) => s.soundEnabled);
   const toggleSound = useAppStore((s) => s.toggleSound);
+  const toggleBatcaveMode = useBatcaveStore((s) => s.toggleBatcaveMode);
 
   return (
     <header className="pointer-events-auto flex items-center justify-between gap-3">
@@ -38,6 +40,19 @@ export default function TopBar() {
         <Toggle active={classicMode} onClick={toggleClassicMode} label="Classic mode">
           <span className="text-xs font-medium">{classicMode ? "Organic" : "Classic"}</span>
         </Toggle>
+        <button
+          onClick={toggleBatcaveMode}
+          className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition hover:text-white"
+          style={{
+            borderColor: "rgba(255,107,44,0.5)",
+            background: "rgba(255,107,44,0.08)",
+            color: "#ff6b2c",
+          }}
+          title="Enter Batcave — live global sentiment"
+        >
+          <BatIcon />
+          <span className="hidden sm:inline">Batcave</span>
+        </button>
       </div>
     </header>
   );
@@ -86,6 +101,14 @@ function SoundOffIcon() {
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <line x1="22" y1="9" x2="16" y2="15" />
       <line x1="16" y1="9" x2="22" y2="15" />
+    </svg>
+  );
+}
+
+function BatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C11 5 9 7 6 8c-1 .3-2 .8-3 1.5C4 11 5 12.5 6.5 13c-1 2-1.5 4-1.5 6 1-1 2.5-2 4-2.5.5 1.5 1.5 3 3 4 1.5-1 2.5-2.5 3-4 1.5.5 3 1.5 4 2.5 0-2-.5-4-1.5-6C19 12.5 20 11 21 9.5c-1-.7-2-1.2-3-1.5-3-1-5-3-6-6z" />
     </svg>
   );
 }
