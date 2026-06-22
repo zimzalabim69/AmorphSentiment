@@ -3,7 +3,17 @@
  * Expects Ollama running at localhost:11434 (default).
  */
 
-const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+function getOllamaHost(): string {
+  const env = process.env.OLLAMA_HOST;
+  // 0.0.0.0, empty string, or missing → fallback to localhost
+  if (!env || env === "0.0.0.0") return "http://localhost:11434";
+  // If it already has a protocol, use as-is
+  if (/^https?:\/\//.test(env)) return env;
+  // If it's just a host:port or IP, prepend http://
+  return `http://${env}`;
+}
+
+const OLLAMA_HOST = getOllamaHost();
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 
 export interface OllamaSentimentResult {
@@ -47,7 +57,7 @@ export async function analyzeBatch(texts: string[]): Promise<OllamaSentimentResu
         seed: 42,
       },
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!res.ok) {
@@ -56,6 +66,22 @@ export async function analyzeBatch(texts: string[]): Promise<OllamaSentimentResu
 
   const data = (await res.json()) as OllamaResponse;
   return parseBatchResponse(data.response, texts.length);
+}
+
+/**
+ * Quick health check — returns true if Ollama is reachable and the model is available.
+ */
+export async function checkOllamaHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${OLLAMA_HOST}/api/tags`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { models?: { name: string }[] };
+    return data.models?.some((m) => m.name === DEFAULT_MODEL) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /**

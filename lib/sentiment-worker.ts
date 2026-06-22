@@ -1,15 +1,20 @@
 /**
- * Async sentiment worker: accumulates incoming posts, batch-processes via Ollama,
+ * Async sentiment worker: accumulates incoming posts, batch-processes via Groq cloud LLM,
  * and emits enriched signals with real NLP sentiment + NER + topics.
  */
 
-import { analyzeBatch, type OllamaSentimentResult } from "./ollama";
-import type { LiveSignal } from "./live-types";
+import {
+  analyzeBatch,
+  checkGroqHealth as checkOllamaHealth,
+  type GroqSentimentResult as OllamaSentimentResult,
+} from "./groq";
+import { analyzeSimple } from "./simple-sentiment";
+import type { LiveSignal, SignalSource } from "./live-types";
 
 interface QueuedItem {
   id: string;
   text: string;
-  source: "bluesky" | "rss";
+  source: SignalSource;
   timestamp: number;
 }
 
@@ -20,22 +25,62 @@ interface WorkerCallback {
 const QUEUE: QueuedItem[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let isProcessing = false;
-const BATCH_SIZE = 5;
-const BATCH_INTERVAL_MS = 2500;
+const BATCH_SIZE = 3;
+const BATCH_INTERVAL_MS = 60_000;
 let callback: WorkerCallback | null = null;
+
+export type WorkerStatus = "idle" | "processing" | "error" | "offline";
+let workerStatus: WorkerStatus = "idle";
+const statusListeners = new Set<(s: WorkerStatus) => void>();
+
+export function getWorkerStatus(): WorkerStatus {
+  return workerStatus;
+}
+
+export function onWorkerStatusChange(fn: (s: WorkerStatus) => void) {
+  statusListeners.add(fn);
+  return () => statusListeners.delete(fn);
+}
+
+function setStatus(s: WorkerStatus) {
+  workerStatus = s;
+  for (const l of statusListeners) try { l(s); } catch { /* noop */ }
+}
 
 /**
  * Start the worker. Call once on app boot.
+ * Performs an initial health check and sets status to offline if LLM is unreachable.
  */
-export function startSentimentWorker(onSignal: WorkerCallback) {
+export async function startSentimentWorker(onSignal: WorkerCallback) {
   callback = onSignal;
+  const healthy = await checkOllamaHealth();
+  if (!healthy) {
+    setStatus("offline");
+    scheduleHealthCheckRetry();
+  }
   scheduleFlush();
+}
+
+let healthRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleHealthCheckRetry() {
+  if (healthRetryTimer) return;
+  healthRetryTimer = setTimeout(async () => {
+    healthRetryTimer = null;
+    if (workerStatus !== "offline") return;
+    const healthy = await checkOllamaHealth();
+    if (healthy) {
+      setStatus("idle");
+    } else {
+      scheduleHealthCheckRetry();
+    }
+  }, 10_000);
 }
 
 /**
  * Queue a raw text for sentiment analysis.
  */
-export function queueText(text: string, source: "bluesky" | "rss") {
+export function queueText(text: string, source: SignalSource) {
   if (!text || text.length < 3) return;
   const trimmed = text.slice(0, 300);
   QUEUE.push({
@@ -69,6 +114,7 @@ async function flushQueue() {
   }
 
   isProcessing = true;
+  setStatus("processing");
   const batch = QUEUE.splice(0, Math.min(BATCH_SIZE, QUEUE.length));
 
   try {
@@ -80,11 +126,13 @@ async function flushQueue() {
       const signal: LiveSignal = buildSignal(item, result);
       callback(signal);
     }
+    setStatus("idle");
   } catch (err) {
-    console.warn("[SentimentWorker] Ollama batch failed:", err);
-    // Fallback: emit signals with basic heuristic sentiment so nothing is lost
+    console.warn("[SentimentWorker] Groq batch failed, using local fallback:", err);
+    setStatus("error");
     for (const item of batch) {
-      const signal: LiveSignal = buildSignal(item, fallbackResult());
+      const localResult = analyzeSimple(item.text);
+      const signal: LiveSignal = buildSignal(item, localResult as OllamaSentimentResult);
       callback(signal);
     }
   } finally {
@@ -94,7 +142,6 @@ async function flushQueue() {
 }
 
 function buildSignal(item: QueuedItem, result: OllamaSentimentResult): LiveSignal {
-  // Use the Ollama result's topics if available, otherwise heuristic classify
   const topics = result.topics.length > 0 ? result.topics : [];
 
   return {

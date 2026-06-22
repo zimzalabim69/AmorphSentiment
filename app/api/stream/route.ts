@@ -7,43 +7,58 @@ export async function GET() {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    start(controller) {
-      // Send initial state
-      const initSignals = getRecentSignals(30);
-      const initAgg = getAggregates();
-      controller.enqueue(
-        encoder.encode(`event: init\ndata: ${JSON.stringify({ signals: initSignals, aggregates: initAgg, totalSignals: getTotalSignals() })}\n\n`)
-      );
+    async start(controller) {
+      let unsubscribe: (() => void) | null = null;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+      let closed = false;
 
-      // Subscribe to live events
-      const unsubscribe = subscribe((event, data) => {
-        try {
-          controller.enqueue(
-            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-          );
-        } catch {
-          unsubscribe();
+      function cleanup() {
+        if (closed) return;
+        closed = true;
+        if (heartbeat) clearInterval(heartbeat);
+        if (unsubscribe) {
+          try { unsubscribe(); } catch { /* noop */ }
+          unsubscribe = null;
         }
-      });
+      }
 
-      // Heartbeat to keep connection alive
-      const heartbeat = setInterval(() => {
+      try {
+        const initSignals = getRecentSignals(30);
+        const initAgg = getAggregates();
+        controller.enqueue(
+          encoder.encode(`event: init\ndata: ${JSON.stringify({ signals: initSignals, aggregates: initAgg, totalSignals: getTotalSignals() })}\n\n`)
+        );
+      } catch {
+        cleanup();
+        return;
+      }
+
+      try {
+        unsubscribe = await subscribe((event, data) => {
+          if (closed) return;
+          try {
+            controller.enqueue(
+              encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+            );
+          } catch {
+            cleanup();
+          }
+        });
+      } catch {
+        cleanup();
+        return;
+      }
+
+      heartbeat = setInterval(() => {
+        if (closed) return;
         try {
           controller.enqueue(encoder.encode(`: heartbeat\n\n`));
         } catch {
-          clearInterval(heartbeat);
-          unsubscribe();
+          cleanup();
         }
       }, 15_000);
-
-      // Cleanup on cancel
-      const origCancel = controller.close.bind(controller);
-      void origCancel; // reference
-      // ReadableStream cancellation is handled via the pull/cancel mechanism
     },
-    cancel() {
-      // Connection closed by client — listeners auto-clean via WeakRef or Set removal
-    },
+    cancel() {},
   });
 
   return new Response(stream, {

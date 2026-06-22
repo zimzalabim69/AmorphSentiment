@@ -8,6 +8,7 @@ import InputOrb from "./ui/InputOrb";
 import PresetTopics from "./ui/PresetTopics";
 import ResultsPanel from "./ui/ResultsPanel";
 import ClassicMode from "./ui/ClassicMode";
+import ErrorBoundary from "./ui/ErrorBoundary";
 import { useAppStore } from "@/lib/store";
 import { useBatcaveStore } from "@/lib/batcave-store";
 
@@ -23,6 +24,15 @@ const OrganismCanvas = dynamic(() => import("./scene/OrganismCanvas"), {
 const BatcaveLayout = dynamic(() => import("./batcave/BatcaveLayout"), {
   ssr: false,
 });
+
+function CanvasFallback() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3">
+      <div className="h-24 w-24 rounded-full bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 blur-xl animate-pulse" />
+      <p className="text-sm text-white/50">3D canvas unavailable · Classic mode recommended</p>
+    </div>
+  );
+}
 
 export default function Experience() {
   const classicMode = useAppStore((s) => s.classicMode);
@@ -48,7 +58,9 @@ export default function Experience() {
             transition={{ duration: 0.8 }}
             className="absolute inset-0"
           >
-            <OrganismCanvas />
+            <ErrorBoundary fallback={<CanvasFallback />}>
+              <OrganismCanvas />
+            </ErrorBoundary>
           </motion.div>
         )}
       </AnimatePresence>

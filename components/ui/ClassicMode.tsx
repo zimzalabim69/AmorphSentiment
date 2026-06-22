@@ -17,7 +17,7 @@ export default function ClassicMode() {
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
         <h2 className="mb-1 text-lg font-semibold text-white">Sentiment dashboard</h2>
         <p className="mb-6 text-sm text-white/45">
-          Classic mode · simulated analysis, no animations
+          Classic mode · LLM-powered analysis via local Ollama
         </p>
 
         {phase === "analyzing" && (
@@ -98,7 +98,7 @@ export default function ClassicMode() {
             </div>
 
             <p className="text-xs text-white/30">
-              Simulated from ~{result.sampleSize.toLocaleString()} signals.
+              Analyzed via local Ollama.
             </p>
           </div>
         )}

@@ -16,6 +16,7 @@ export default function Blob() {
   const hoverTarget = useRef(0);
   const shockwaveDecay = useRef(0);
   const prevIntensity = useRef(0);
+  const anomalyFlash = useRef(0);
 
   const result = useAppStore((s) => s.result);
   const phase = useAppStore((s) => s.phase);
@@ -31,6 +32,8 @@ export default function Blob() {
       uPulse: { value: 0 },
       uShockwave: { value: 0 },
       uGlobalIntensity: { value: 0 },
+      uVolume: { value: 0 },
+      uAnomalyFlash: { value: 0 },
       uColorCore: { value: new THREE.Color(SENTIMENT_COLORS.neutral.core) },
       uColorGlow: { value: new THREE.Color(SENTIMENT_COLORS.neutral.glow) },
       uColorAccent: { value: new THREE.Color(SENTIMENT_COLORS.neutral.accent) },
@@ -59,8 +62,17 @@ export default function Blob() {
     prevIntensity.current = globalIntensity;
     shockwaveDecay.current = Math.max(0, shockwaveDecay.current - delta * 2.0);
 
+    // Anomaly flash from store
+    const anomalies = batState.anomalies;
+    const latestAnomaly = anomalies[0];
+    if (latestAnomaly && Date.now() - latestAnomaly.timestamp < 3000) {
+      anomalyFlash.current = 1.0;
+    }
+    anomalyFlash.current = Math.max(0, anomalyFlash.current - delta * 3.0);
+
     u.uShockwave.value = lerp(u.uShockwave.value, shockwaveDecay.current, Math.min(1, delta * 8));
     u.uGlobalIntensity.value = lerp(u.uGlobalIntensity.value, globalIntensity, Math.min(1, delta * 3));
+    u.uAnomalyFlash.value = lerp(u.uAnomalyFlash.value, anomalyFlash.current, Math.min(1, delta * 6));
 
     // While analyzing, agitate the organism toward a churning, high-energy state.
     const analyzing = phase === "analyzing";
@@ -70,6 +82,7 @@ export default function Blob() {
     let intensity = analyzing ? 1.0 : (result?.intensity ?? 0.4);
     let dominant = result?.dominant ?? "neutral";
 
+    let volumeNorm = 0;
     if (batcaveMode) {
       const agg = useBatcaveStore.getState().aggregates;
       const activeWindow = useBatcaveStore.getState().activeWindow;
@@ -78,6 +91,7 @@ export default function Blob() {
         scores = active.scores;
         intensity = active.intensity;
         dominant = active.dominant;
+        volumeNorm = Math.min(1, active.volume / 40); // normalize: 40 signals = full turbulence
       }
     }
 
@@ -86,6 +100,7 @@ export default function Blob() {
     u.uNegative.value = lerp(u.uNegative.value, analyzing ? 0.6 : scores.negative, k);
     u.uNeutral.value = lerp(u.uNeutral.value, analyzing ? 0.5 : scores.neutral, k);
     u.uIntensity.value = lerp(u.uIntensity.value, intensity, k);
+    u.uVolume.value = lerp(u.uVolume.value, volumeNorm, Math.min(1, delta * 2));
 
     // Breathing pulse — faster + stronger while analyzing or high global intensity.
     // HyperFocus amplifies everything

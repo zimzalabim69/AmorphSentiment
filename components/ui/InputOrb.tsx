@@ -10,14 +10,23 @@ export default function InputOrb() {
   const phase = useAppStore((s) => s.phase);
   const setQuery = useAppStore((s) => s.setQuery);
   const analyze = useAppStore((s) => s.analyze);
+  const searchAndAnalyze = useAppStore((s) => s.searchAndAnalyze);
+  const searchMode = useAppStore((s) => s.searchMode);
+  const toggleSearchMode = useAppStore((s) => s.toggleSearchMode);
   const result = useAppStore((s) => s.result);
+  const errorMessage = useAppStore((s) => s.errorMessage);
 
   const analyzing = phase === "analyzing";
+  const isError = phase === "error";
   const palette = SENTIMENT_COLORS[result?.dominant ?? "neutral"];
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    analyze();
+    if (searchMode) {
+      searchAndAnalyze();
+    } else {
+      analyze();
+    }
   };
 
   return (
@@ -31,7 +40,9 @@ export default function InputOrb() {
                 `0 0 60px ${palette.glow}aa`,
                 `0 0 30px ${palette.glow}55`,
               ]
-            : `0 0 24px ${palette.glow}33`,
+            : isError
+              ? `0 0 24px rgba(255,61,61,0.3)`
+              : `0 0 24px ${palette.glow}33`,
         }}
         transition={{ duration: 1.4, repeat: analyzing ? Infinity : 0, ease: "easeInOut" }}
       >
@@ -44,7 +55,11 @@ export default function InputOrb() {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(e);
               }}
               rows={2}
-              placeholder="Feed the organism… e.g. “Latest reactions to the Aurora rocket launch” or paste any text / URL"
+              placeholder={
+                searchMode
+                  ? "Search a topic and analyze live news… e.g. “SpaceX launch” or “crypto regulation”"
+                  : "Feed the organism… paste any text, article, or thoughts to analyze"
+              }
               className="max-h-40 min-h-[3.5rem] w-full resize-none rounded-[1.6rem] bg-transparent px-5 py-3.5 text-sm text-white/90 placeholder:text-white/35 focus:outline-none sm:text-base"
             />
           </div>
@@ -57,7 +72,9 @@ export default function InputOrb() {
             whileTap={{ scale: 0.96 }}
             className="relative mb-1.5 mr-1.5 flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-full px-5 text-sm font-semibold text-black transition disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
             style={{
-              background: `linear-gradient(135deg, ${palette.core}, ${palette.glow})`,
+              background: isError
+                ? `linear-gradient(135deg, #ff3d3d, #ff6b2c)`
+                : `linear-gradient(135deg, ${palette.core}, ${palette.glow})`,
             }}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -72,6 +89,15 @@ export default function InputOrb() {
                   <PulseDots />
                   Sensing
                 </motion.span>
+              ) : isError ? (
+                <motion.span
+                  key="error"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                >
+                  Retry
+                </motion.span>
               ) : (
                 <motion.span
                   key="analyze"
@@ -79,16 +105,30 @@ export default function InputOrb() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                 >
-                  Analyze
+                  {searchMode ? "Search" : "Analyze"}
                 </motion.span>
               )}
             </AnimatePresence>
           </motion.button>
         </div>
       </motion.div>
-      <p className="mt-2 px-2 text-center text-[11px] text-white/35">
-        Simulated analysis · press ⌘/Ctrl + Enter to submit
-      </p>
+
+      <div className="mt-2 flex items-center justify-between px-2">
+        <button
+          type="button"
+          onClick={toggleSearchMode}
+          className="text-[11px] text-white/35 transition hover:text-white/70"
+        >
+          {searchMode ? "Switch to text analysis" : "Switch to news search"}
+        </button>
+        <span className="text-[11px] text-white/35">
+          {isError && errorMessage ? (
+            <span className="text-red-400">{errorMessage}</span>
+          ) : (
+            `LLM-powered · press ⌘/Ctrl + Enter to submit`
+          )}
+        </span>
+      </div>
     </form>
   );
 }

@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import { useLiveStream } from "@/lib/use-stream";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import BatcaveTopBar from "./BatcaveTopBar";
+import SituationReport from "./SituationReport";
 import LiveFeed from "./LiveFeed";
+import QuickStats from "./QuickStats";
 import EmotionRadar from "./EmotionRadar";
 import KeyPhrases from "./KeyPhrases";
-import IntensityMeter from "./IntensityMeter";
 import EntityTracker from "./EntityTracker";
 import BottomHUD from "./BottomHUD";
 import TopicFilters from "./TopicFilters";
@@ -28,9 +29,14 @@ export default function BatcaveLayout() {
 
       {/* Main content area: left panel | center blob | right panel */}
       <div className="flex-1 flex min-h-0">
-        {/* Left panel — Live Feed */}
+        {/* Left panel — Situation Report + Live Feed */}
         <aside className="hidden lg:flex flex-col w-72 xl:w-80 p-2 gap-2 overflow-hidden">
-          <LiveFeed />
+          <div className="h-48 shrink-0">
+            <SituationReport />
+          </div>
+          <div className="flex-1 min-h-0">
+            <LiveFeed />
+          </div>
         </aside>
 
         {/* Center — 3D organism (full bleed) */}
@@ -46,9 +52,9 @@ export default function BatcaveLayout() {
           </div>
         </main>
 
-        {/* Right panel — Intensity + Emotion Radar + Phrases + Entity Tracker */}
+        {/* Right panel — Quick Stats + Emotion Radar + Phrases + Entity Tracker */}
         <aside className="hidden lg:flex flex-col w-64 xl:w-72 p-2 gap-2 overflow-y-auto">
-          <IntensityMeter />
+          <QuickStats />
           <EmotionRadar />
           <KeyPhrases />
           <EntityTracker />

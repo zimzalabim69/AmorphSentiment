@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import ToastContainer from "@/components/ui/Toasts";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space",
@@ -8,13 +10,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "AmorphSentiment · a living sentiment organism",
+  title: "Sentinel · real-time global sentiment intelligence",
   description:
-    "An amorphous, bioluminescent sentiment analysis demo. Feed it text and watch a living organism bloom, spike, or drift with the mood.",
+    "Live multi-source sentiment analysis across Bluesky, Reddit, Hacker News, and news feeds. Real-time LLM-powered mood tracking with 3D visualization.",
   openGraph: {
-    title: "AmorphSentiment",
+    title: "Sentinel",
     description:
-      "A living, blob-like sentiment analysis organism built with Next.js, React Three Fiber and shaders.",
+      "Real-time global sentiment intelligence — live mood tracking across social media and news.",
     type: "website",
   },
 };
@@ -33,7 +35,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="h-full bg-[#03040a] font-sans text-white">{children}</body>
+      <body className="h-full bg-[#03040a] font-sans text-white">
+        <ErrorBoundary>
+          {children}
+          <ToastContainer />
+        </ErrorBoundary>
+      </body>
     </html>
   );
 }

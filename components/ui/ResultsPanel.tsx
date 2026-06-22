@@ -114,8 +114,7 @@ export default function ResultsPanel() {
           </div>
 
           <p className="mt-5 text-[11px] text-white/30">
-            Simulated from ~{result.sampleSize.toLocaleString()} signals · intensity{" "}
-            {Math.round(result.intensity * 100)}%
+            Analyzed via local Ollama · intensity {Math.round(result.intensity * 100)}%
           </p>
         </motion.aside>
       )}

@@ -60,6 +60,8 @@ uniform float uHover;
 uniform float uPulse;
 uniform float uShockwave;
 uniform float uGlobalIntensity;
+uniform float uVolume;
+uniform float uAnomalyFlash;
 
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -87,6 +89,14 @@ float displace(vec3 p) {
   float spikes = abs(snoise(p * 3.6 + vec3(t * 1.8)));
   spikes = pow(spikes, 1.5) * 1.3;
 
+  // Volume turbulence — more chaotic when many signals are flowing
+  float volTurb = 0.0;
+  if (uVolume > 0.01) {
+    float v1 = snoise(p * 5.0 + vec3(uTime * 2.5, 0.0, 0.0));
+    float v2 = snoise(p * 7.0 + vec3(0.0, uTime * 3.0, 0.0));
+    volTurb = (v1 + v2) * 0.5 * uVolume * 0.6;
+  }
+
   // Shockwave turbulence — triggered by sudden spikes in live data
   float shock = 0.0;
   if (uShockwave > 0.01) {
@@ -95,12 +105,21 @@ float displace(vec3 p) {
     shock = (wave * 0.6 + highFreq * 0.4) * uShockwave;
   }
 
+  // Anomaly flash — brief surface ripples
+  float anomalyRipple = 0.0;
+  if (uAnomalyFlash > 0.01) {
+    float ripple = sin(length(p) * 15.0 - uTime * 10.0) * 0.5 + 0.5;
+    anomalyRipple = ripple * uAnomalyFlash * 0.5;
+  }
+
   float energy = 0.25 + totalIntensity * 1.1;
   float d =
       bloom  * (0.45 + uPositive * 0.9) * energy
     + waves  * (0.30 + uNeutral  * 0.8) * energy
     + spikes * (uNegative * 1.6) * energy
-    + shock  * energy;
+    + shock  * energy
+    + volTurb * energy
+    + anomalyRipple * energy;
 
   // Global breathing pulse — deeper at higher global intensity.
   d += uPulse * (0.12 + totalIntensity * 0.25);
@@ -147,6 +166,7 @@ uniform float uIntensity;
 uniform float uHover;
 uniform float uShockwave;
 uniform float uGlobalIntensity;
+uniform float uAnomalyFlash;
 
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -179,6 +199,12 @@ void main() {
   if (uShockwave > 0.01) {
     float shockGlow = uShockwave * smoothstep(0.3, 0.9, vDisplacement) * 1.5;
     color += vec3(1.0, 0.85, 0.6) * shockGlow;
+  }
+
+  // Anomaly flash: red-amber warning tint on raised areas.
+  if (uAnomalyFlash > 0.01) {
+    float flashGlow = uAnomalyFlash * smoothstep(0.2, 0.8, vDisplacement) * 0.8;
+    color += vec3(1.0, 0.3, 0.1) * flashGlow;
   }
 
   // Subtle core darkening for depth.

@@ -33,9 +33,13 @@ export default function Particles() {
   useFrame((state, delta) => {
     if (!pointsRef.current) return;
 
-    // Live intensity drives particle speed + opacity
-    const globalIntensity = useBatcaveStore.getState().globalIntensity;
-    const speedMult = 1.0 + globalIntensity * 2.5;
+    // Live intensity + volume drive particle speed + opacity
+    const store = useBatcaveStore.getState();
+    const globalIntensity = store.globalIntensity;
+    const active = store.aggregates.find((a) => a.window === store.activeWindow);
+    const volume = active?.volume ?? 0;
+    const volumeMult = 1.0 + Math.min(1, volume / 40) * 2.0;
+    const speedMult = (1.0 + globalIntensity * 2.5) * volumeMult;
 
     const geo = pointsRef.current.geometry;
     const pos = geo.attributes.position as THREE.BufferAttribute;

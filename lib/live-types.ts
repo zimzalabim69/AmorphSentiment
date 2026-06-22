@@ -6,11 +6,13 @@ export interface Entity {
   type: "PERSON" | "ORG" | "GPE" | "PRODUCT" | "TICKER" | "EVENT" | "TECH" | string;
 }
 
-/** A single analyzed signal from Bluesky or RSS */
+export type SignalSource = "bluesky" | "rss" | "reddit" | "hackernews" | "newsapi";
+
+/** A single analyzed signal from any source */
 export interface LiveSignal {
   id: string;
   text: string;
-  source: "bluesky" | "rss";
+  source: SignalSource;
   dominant: Sentiment;
   scores: SentimentScores;
   intensity: number;

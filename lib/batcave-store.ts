@@ -2,41 +2,36 @@
 
 import { create } from "zustand";
 import type { LiveSignal, LiveAggregate, TopicFilter } from "./live-types";
+import type { AnomalyRecord, SynthesisReport } from "./db";
 
 interface HyperFocusState {
-  /** Whether hyper-focus is active */
   active: boolean;
-  /** The keyword/topic being focused on (custom or preset) */
   keyword: string;
-  /** Signals matching the focused keyword */
   focusedSignals: LiveSignal[];
-  /** Sentiment history for sparkline (last 50 intensity readings) */
   sentimentHistory: number[];
-  /** Timestamp when focus started */
   startedAt: number;
 }
 
-interface BatcaveState {
-  /** Whether the live stream is connected */
-  connected: boolean;
-  /** Recent signals (capped at 200 for frontend) */
-  signals: LiveSignal[];
-  /** Rolling aggregates [30s, 2min, 10min] */
-  aggregates: LiveAggregate[];
-  /** Total signals processed since daemon started */
-  totalSignals: number;
-  /** Active topic filter */
-  topicFilter: TopicFilter;
-  /** Active time window for display */
-  activeWindow: "30s" | "2min" | "10min";
-  /** Global intensity (derived from live aggregates) */
-  globalIntensity: number;
-  /** Whether batcave (live) mode is active */
-  batcaveMode: boolean;
-  /** HyperFocus state */
-  hyperFocus: HyperFocusState;
+interface TrendingTopic {
+  topic: string;
+  volume: number;
+  velocity: number;
+}
 
-  // Actions
+interface BatcaveState {
+  connected: boolean;
+  signals: LiveSignal[];
+  aggregates: LiveAggregate[];
+  totalSignals: number;
+  topicFilter: TopicFilter;
+  activeWindow: "30s" | "2min" | "10min";
+  globalIntensity: number;
+  batcaveMode: boolean;
+  hyperFocus: HyperFocusState;
+  trendingTopics: TrendingTopic[];
+  anomalies: AnomalyRecord[];
+  latestReport: SynthesisReport | null;
+
   setConnected: (v: boolean) => void;
   addSignal: (s: LiveSignal) => void;
   setAggregates: (agg: LiveAggregate[]) => void;
@@ -45,10 +40,11 @@ interface BatcaveState {
   setActiveWindow: (w: "30s" | "2min" | "10min") => void;
   toggleBatcaveMode: () => void;
   initFromServer: (signals: LiveSignal[], aggregates: LiveAggregate[], total: number) => void;
-  /** Enter hyper-focus on a keyword */
   enterHyperFocus: (keyword: string) => void;
-  /** Exit hyper-focus */
   exitHyperFocus: () => void;
+  setTrendingTopics: (topics: TrendingTopic[]) => void;
+  addAnomaly: (a: AnomalyRecord) => void;
+  setLatestReport: (r: SynthesisReport) => void;
 }
 
 const DEFAULT_HYPERFOCUS: HyperFocusState = {
@@ -67,8 +63,11 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
   topicFilter: "all",
   activeWindow: "2min",
   globalIntensity: 0,
-  batcaveMode: false,
+  batcaveMode: true,
   hyperFocus: DEFAULT_HYPERFOCUS,
+  trendingTopics: [],
+  anomalies: [],
+  latestReport: null,
 
   setConnected: (v) => set({ connected: v }),
 
@@ -77,21 +76,20 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
       const next = [...state.signals, s].slice(-200);
       return { signals: next, totalSignals: state.totalSignals + 1 };
     });
-    // Update global intensity from recent burst
     const recent = get().signals.slice(-20);
     const avgIntensity = recent.reduce((sum, sig) => sum + sig.intensity, 0) / Math.max(recent.length, 1);
     set({ globalIntensity: avgIntensity });
 
-    // If hyper-focus is active, check if signal matches the keyword
     const { hyperFocus } = get();
     if (hyperFocus.active && hyperFocus.keyword) {
       const kw = hyperFocus.keyword.toLowerCase();
-      const matchesText = s.text.toLowerCase().includes(kw);
-      const matchesTopic = s.topic?.toLowerCase() === kw;
-      const matchesTopics = s.topics.some((t) => t.toLowerCase() === kw);
-      const matchesEntities = s.entities.some((e) => e.name.toLowerCase() === kw || e.type.toLowerCase() === kw);
-      const matchesPhrases = s.keyPhrases.some((p) => p.toLowerCase().includes(kw));
-      if (matchesText || matchesTopic || matchesTopics || matchesEntities || matchesPhrases) {
+      const matches =
+        s.text.toLowerCase().includes(kw) ||
+        s.topic?.toLowerCase() === kw ||
+        s.topics.some((t) => t.toLowerCase() === kw) ||
+        s.entities.some((e) => e.name.toLowerCase() === kw || e.type.toLowerCase() === kw) ||
+        s.keyPhrases.some((p) => p.toLowerCase().includes(kw));
+      if (matches) {
         set((state) => ({
           hyperFocus: {
             ...state.hyperFocus,
@@ -105,7 +103,6 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
 
   setAggregates: (agg) => {
     set({ aggregates: agg });
-    // Derive global intensity from active window
     const { activeWindow } = get();
     const active = agg.find((a) => a.window === activeWindow);
     if (active) set({ globalIntensity: active.intensity });
@@ -145,4 +142,10 @@ export const useBatcaveStore = create<BatcaveState>((set, get) => ({
   },
 
   exitHyperFocus: () => set({ hyperFocus: DEFAULT_HYPERFOCUS }),
+
+  setTrendingTopics: (topics) => set({ trendingTopics: topics }),
+
+  addAnomaly: (a) => set((state) => ({ anomalies: [a, ...state.anomalies].slice(0, 50) })),
+
+  setLatestReport: (r) => set({ latestReport: r }),
 }));

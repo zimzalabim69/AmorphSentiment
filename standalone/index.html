@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmorphSentiment — Global Mood Organism</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #010104;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10;
+      padding: 20px;
+      pointer-events: none;
+      width: 100%;
+    }
+    #ui > * { pointer-events: auto; }
+    h1 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ff6b2c;
+      text-shadow: 0 0 12px rgba(255,107,44,0.4);
+      margin-bottom: 8px;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #a0a0a0;
+      margin-bottom: 12px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #333;
+      transition: background 0.3s;
+    }
+    .status-dot.connected { background: #39ffb0; box-shadow: 0 0 6px rgba(57,255,176,0.5); }
+    .status-dot.error { background: #ff3d3d; box-shadow: 0 0 6px rgba(255,61,61,0.5); }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      max-width: 500px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+    }
+    .stat-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .stat-value.sentiment { color: #39ffb0; }
+    .stat-value.sentiment.negative { color: #ff3d3d; }
+    .stat-value.volume { color: #7af5ff; }
+    .topics {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-width: 500px;
+    }
+    .topic-tag {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(122,245,255,0.08);
+      border: 1px solid rgba(122,245,255,0.2);
+      color: #7af5ff;
+      font-family: monospace;
+    }
+    #bottom-hud {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-family: monospace;
+      color: #555;
+      z-index: 10;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="ui">
+  <h1>AmorphSentiment</h1>
+  <div class="status">
+    <span class="status-dot" id="conn-dot"></span>
+    <span id="conn-text">Connecting...</span>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Sentiment</div>
+      <div class="stat-value sentiment" id="stat-sentiment">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Volume / min</div>
+      <div class="stat-value volume" id="stat-volume">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Dominant Mood</div>
+      <div class="stat-value" id="stat-emotion">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Intensity</div>
+      <div class="stat-value" id="stat-intensity">—</div>
+    </div>
+  </div>
+  <div class="topics" id="topics"></div>
+</div>
+
+<div id="bottom-hud">
+  <span>Bluesky Jetstream + Reddit + HN</span>
+  <span>Real-time LLM Analysis</span>
+</div>
+
+<script>
+// ---------- Three.js Setup ----------
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.z = 5.5;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x010104, 1);
+container.appendChild(renderer.domElement);
+
+// Fog for depth
+scene.fog = new THREE.FogExp2(0x010104, 0.06);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x404040, 0.6));
+const keyLight = new THREE.PointLight(0xffffff, 1.2, 50);
+keyLight.position.set(5, 5, 5);
+scene.add(keyLight);
+const fillLight = new THREE.PointLight(0x7af5ff, 0.6, 50);
+fillLight.position.set(-5, -3, 3);
+scene.add(fillLight);
+const rimLight = new THREE.PointLight(0xff6b2c, 0.4, 50);
+rimLight.position.set(0, 0, -8);
+scene.add(rimLight);
+
+// ---------- Blob Geometry ----------
+const geometry = new THREE.IcosahedronGeometry(1.4, 5);
+const material = new THREE.MeshPhysicalMaterial({
+  color: 0x00aaff,
+  metalness: 0.1,
+  roughness: 0.3,
+  emissive: 0x002244,
+  emissiveIntensity: 0.4,
+  transparent: true,
+  opacity: 0.92,
+  clearcoat: 0.8,
+  clearcoatRoughness: 0.2,
+});
+const blob = new THREE.Mesh(geometry, material);
+scene.add(blob);
+
+// Store original positions to prevent geometry drift
+const originalPositions = new Float32Array(geometry.attributes.position.count * 3);
+for (let i = 0; i < geometry.attributes.position.count; i++) {
+  originalPositions[i * 3] = geometry.attributes.position.getX(i);
+  originalPositions[i * 3 + 1] = geometry.attributes.position.getY(i);
+  originalPositions[i * 3 + 2] = geometry.attributes.position.getZ(i);
+}
+
+// Particles
+const particleCount = 600;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(particleCount * 3);
+const pSpeeds = new Float32Array(particleCount);
+for (let i = 0; i < particleCount; i++) {
+  const r = 3 + Math.random() * 7;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  pPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+  pPos[i * 3 + 1] = (Math.random() - 0.5) * 12;
+  pPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  pSpeeds[i] = 0.03 + Math.random() * 0.15;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({
+  size: 0.04,
+  color: 0x7af5ff,
+  transparent: true,
+  opacity: 0.6,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+// ---------- State ----------
+let sentiment = 0;      // -1 to 1
+let volume = 0;
+let dominantEmotion = 'neutral';
+let topics = [];
+let intensity = 0.5;
+let connected = false;
+let lastUpdate = Date.now();
+
+// ---------- SSE Connection ----------
+function connectSSE() {
+  const evtSource = new EventSource('/stream');
+
+  evtSource.onopen = () => {
+    connected = true;
+    document.getElementById('conn-dot').className = 'status-dot connected';
+    document.getElementById('conn-text').textContent = 'Live stream connected';
+  };
+
+  evtSource.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      sentiment = data.avg_sentiment;
+      volume = data.volume;
+      dominantEmotion = data.dominant_emotion;
+      topics = data.top_topics || [];
+      intensity = Math.min(1, volume / 50 + 0.2);
+      lastUpdate = Date.now();
+      updateUI();
+    } catch (err) {
+      console.warn('SSE parse error:', err);
+    }
+  };
+
+  evtSource.onerror = () => {
+    connected = false;
+    document.getElementById('conn-dot').className = 'status-dot error';
+    document.getElementById('conn-text').textContent = 'Reconnecting...';
+    evtSource.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+connectSSE();
+
+// ---------- UI Update ----------
+function updateUI() {
+  const pct = (sentiment * 100).toFixed(1);
+  const sentEl = document.getElementById('stat-sentiment');
+  sentEl.textContent = `${pct}%`;
+  sentEl.classList.toggle('negative', sentiment < 0);
+
+  document.getElementById('stat-volume').textContent = volume;
+  document.getElementById('stat-emotion').textContent = dominantEmotion;
+  document.getElementById('stat-intensity').textContent = `${Math.round(intensity * 100)}%`;
+
+  const topicsEl = document.getElementById('topics');
+  topicsEl.innerHTML = topics.map(t => `<span class="topic-tag">#${t}</span>`).join('');
+}
+
+// ---------- Animation Loop ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const dt = clock.getDelta();
+
+  // --- Blob deformation (always reset from original positions) ---
+  const positions = geometry.attributes.position;
+  const totalIntensity = intensity + 0.3;
+
+  for (let i = 0; i < positions.count; i++) {
+    const ox = originalPositions[i * 3];
+    const oy = originalPositions[i * 3 + 1];
+    const oz = originalPositions[i * 3 + 2];
+
+    // Multi-octave noise-like deformation
+    const d1 = Math.sin(t * 1.2 + ox * 2.5) * 0.12 * totalIntensity;
+    const d2 = Math.cos(t * 0.8 + oy * 3.0 + oz) * 0.08 * totalIntensity;
+    const d3 = Math.sin(t * 2.1 + ox * 4.0 + oy * 2.0) * 0.05 * totalIntensity;
+
+    // Sentiment drives expansion/contraction bias
+    const sentimentBias = sentiment * 0.08;
+
+    positions.setXYZ(
+      i,
+      ox * (1 + d1 + sentimentBias),
+      oy * (1 + d2 + sentimentBias * 0.5),
+      oz * (1 + d3 + sentimentBias * 0.7)
+    );
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+
+  // --- Color: sentiment drives hue ---
+  // sentiment -1 (red/orange) → 0 (cyan/blue) → 1 (green)
+  const hue = sentiment < 0
+    ? 0.02 + (sentiment + 1) * 0.15   // red → orange
+    : 0.45 + sentiment * 0.25;         // cyan → green
+  material.color.setHSL(Math.max(0, Math.min(1, hue)), 0.85, 0.55);
+  material.emissive.setHSL(Math.max(0, Math.min(1, hue)), 0.9, 0.15);
+
+  // --- Lights follow sentiment ---
+  keyLight.color.setHSL(hue, 0.5, 0.7);
+  fillLight.intensity = 0.4 + intensity * 0.8;
+  rimLight.intensity = 0.2 + Math.abs(sentiment) * 0.6;
+
+  // --- Rotation & Pulse ---
+  blob.rotation.y += dt * (0.1 + intensity * 0.3);
+  blob.rotation.x = Math.sin(t * 0.3) * 0.1;
+
+  const breathe = 1 + Math.sin(t * (1.0 + intensity * 2)) * 0.03 * intensity;
+  blob.scale.setScalar(breathe);
+
+  // --- Particles ---
+  const pPositions = particles.geometry.attributes.position;
+  const pArr = pPositions.array;
+  const speedMult = 1.0 + intensity * 2;
+  for (let i = 0; i < particleCount; i++) {
+    pArr[i * 3 + 1] += pSpeeds[i] * speedMult * 0.015;
+    if (pArr[i * 3 + 1] > 6) pArr[i * 3 + 1] = -6;
+  }
+  pPositions.needsUpdate = true;
+  particles.rotation.y += dt * 0.02;
+
+  // Particle color follows blob
+  pMat.color.copy(material.color);
+  pMat.opacity = 0.4 + intensity * 0.4;
+
+  renderer.render(scene, camera);
+}
+
+// ---------- Resize ----------
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
