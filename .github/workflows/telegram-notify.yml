@@ -1,0 +1,71 @@
+name: Telegram Notify
+
+on:
+  push:
+  pull_request:
+  issues:
+  issue_comment:
+  fork:
+  release:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          EVENT="${{ github.event_name }}"
+          REPO="${{ github.repository }}"
+          ACTOR="${{ github.actor }}"
+          
+          case "$EVENT" in
+            push)
+              COMMITS=$(echo '${{ toJSON(github.event.commits) }}' | jq -r '. | length')
+              MSG=$(echo '${{ toJSON(github.event.head_commit.message) }}' | jq -r '. | split("\n")[0]')
+              BRANCH=$(echo '${{ github.ref }}' | sed 's|refs/heads/||')
+              TEXT="📦 Push to $REPO ($BRANCH)
+          by $ACTOR — $COMMITS commit(s)
+          $MSG"
+              ;;
+            pull_request)
+              ACTION="${{ github.event.action }}"
+              TITLE="${{ github.event.pull_request.title }}"
+              NUM="${{ github.event.pull_request.number }}"
+              TEXT="🔀 PR #$NUM $ACTION in $REPO
+          by $ACTOR
+          $TITLE"
+              ;;
+            issues)
+              ACTION="${{ github.event.action }}"
+              TITLE="${{ github.event.issue.title }}"
+              NUM="${{ github.event.issue.number }}"
+              TEXT="❗️ Issue #$NUM $ACTION in $REPO
+          by $ACTOR
+          $TITLE"
+              ;;
+            release)
+              ACTION="${{ github.event.action }}"
+              TAG="${{ github.event.release.tag_name }}"
+              NAME="${{ github.event.release.name }}"
+              TEXT="🏷 Release $ACTION in $REPO
+          $TAG — $NAME"
+              ;;
+            fork)
+              TEXT="🍴 $REPO forked by $ACTOR"
+              ;;
+            *)
+              TEXT="🔔 $EVENT in $REPO by $ACTOR"
+              ;;
+          esac
+          
+          curl -s --max-time 10 \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${TEXT}" \
+            -d "disable_web_page_preview=true"
